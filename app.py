@@ -48,7 +48,7 @@ st.title("🏠 Predictor de Precios de Viviendas")
 st.markdown("Esta aplicación permite predecir el precio de viviendas basado en características clave.")
 
 # Sidebar para navegación
-page = st.sidebar.radio("Navegación", ["Inicio", "Análisis Exploratorio", "Predicción", "Acerca de"])
+page = st.sidebar.radio("Navegación", ["Inicio", "Análisis Exploratorio", "Predicción", "Acerca de", "Contacto"])
 
 # Página de inicio
 if page == "Inicio":
@@ -212,3 +212,15 @@ elif page == "Predicción":
             
             # Mostrar interpretación de la predicción
             st.subheader("Interpretación de la predicción")
+
+elif page == "Contacto":
+    st.header("Contacto")
+    
+    st.markdown("""
+    Esta aplicación fue desarrollada como parte de un proyecto para predecir precios de viviendas
+    utilizando un modelo de regresión. El modelo fue entrenado con el conjunto de datos Boston Housing.
+    
+    ### Desarrollador
+    - **Nombre:** Felipe Barrera"
+    - **Email:** fbarrerah9@gmail.com
+                """)
