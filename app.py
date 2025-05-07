@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import torch
 from transformers import pipeline
 from io import StringIO
 
@@ -45,10 +46,8 @@ except ImportError:
     st.stop()
 
 generator = load_ai_model()
-
 if generator is None:
     st.stop()  # Detener la app si falla la carga
-generator = load_ai_model()
 
 # Función para generar texto con IA
 def generate_ai_text(prompt, max_length=200):
