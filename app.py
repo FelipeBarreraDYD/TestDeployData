@@ -22,19 +22,28 @@ st.set_page_config(
 @st.cache_resource(show_spinner="Cargando modelo de IA...")
 def load_ai_model():
     try:
+        # Forzar uso de CPU y evitar dependencias de GPU
         return pipeline(
-            task="text2text-generation",  # Más específico para FLAN-T5
+            task="text2text-generation",
             model="google/flan-t5-small",
-            device=-1,  # Forzar CPU
-            torch_dtype="auto" if False else None,  # Evitar uso de GPU
-            max_length=200,  # Longitud máxima por defecto
-            truncation=True
+            device_map="cpu",
+            torch_dtype=torch.float32,
+            low_cpu_mem_usage=True
         )
+    except ImportError:
+        st.error("Se requiere PyTorch para ejecutar el modelo. Instala con: pip install torch==2.2.0+cpu")
+        st.stop()
     except Exception as e:
         st.error(f"Error cargando el modelo: {str(e)}")
-        return None
+        st.stop()
 
-# Cargar con verificación
+# Verificar instalación de torch antes de cargar
+try:
+    import torch
+except ImportError:
+    st.error("PyTorch no está instalado. Ejecuta: pip install torch==2.2.0+cpu")
+    st.stop()
+
 generator = load_ai_model()
 
 if generator is None:
