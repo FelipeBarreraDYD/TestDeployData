@@ -46,9 +46,6 @@ except ImportError:
     st.stop()
 
 generator = load_ai_model()
-if generator is None:
-    st.stop()  # Detener la app si falla la carga
-
 # Función para generar texto con IA
 def generate_ai_text(prompt, max_length=200):
     try:
