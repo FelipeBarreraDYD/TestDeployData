@@ -18,11 +18,27 @@ st.set_page_config(
     layout="wide"
 )
 
-# Cargar modelo de lenguaje
-@st.cache_resource
+# Cargar modelo de lenguaje con manejo de errores y configuración óptima
+@st.cache_resource(show_spinner="Cargando modelo de IA...")
 def load_ai_model():
-    return pipeline("text-generation", model="google/flan-t5-small", device=-1)
+    try:
+        return pipeline(
+            task="text2text-generation",  # Más específico para FLAN-T5
+            model="google/flan-t5-small",
+            device=-1,  # Forzar CPU
+            torch_dtype="auto" if False else None,  # Evitar uso de GPU
+            max_length=200,  # Longitud máxima por defecto
+            truncation=True
+        )
+    except Exception as e:
+        st.error(f"Error cargando el modelo: {str(e)}")
+        return None
 
+# Cargar con verificación
+generator = load_ai_model()
+
+if generator is None:
+    st.stop()  # Detener la app si falla la carga
 generator = load_ai_model()
 
 # Función para generar texto con IA
