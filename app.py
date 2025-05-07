@@ -21,7 +21,7 @@ st.set_page_config(
 # Cargar modelo de lenguaje
 @st.cache_resource
 def load_ai_model():
-    return pipeline("text2text-generation", model="google/flan-t5-small")
+    return pipeline("text-generation", model="google/flan-t5-small", device=-1)
 
 generator = load_ai_model()
 
