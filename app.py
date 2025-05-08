@@ -22,28 +22,35 @@ else:
 # Función para análisis con Gemini
 def generar_analisis_ia(df):
     try:
-        genai.configure(
-            api_key=os.getenv("GEMINI_KEY"),
-            client_options={
-                'api_endpoint': 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
-            }
-        )
-        model = genai.GenerativeModel('gemini-2.0-flash')
-        prompt = {
-            "contents": [{
-                "parts": [{
-                    "text": f"Analiza este dataset (responde en español): Columnas: {df.columns.tolist()}. Muestra: {df.head(2).to_dict()}"
-                }]
-            }]
-        }
+        # 1. Configurar con modelo válido
+        genai.configure(api_key=os.getenv("GEMINI_KEY"))
+        model = genai.GenerativeModel('gemini-pro')  # Modelo comprobado
+        
+        # 2. Crear prompt con estructura correcta
+        texto_prompt = f"""
+        Analiza este dataset en español:
+        - Columnas: {', '.join(df.columns)}
+        - Muestra: {df.head(2).to_string()}
+        """
+        # 3. Formato correcto usando la API de Python
         response = model.generate_content(
-            prompt,
-            request_options={'timeout': 60, 'retry': 3}
+            contents=[
+                {
+                    "role": "user",
+                    "parts": [{"text": texto_prompt}]
+                }
+            ],
+            generation_config={
+                "max_output_tokens": 500,
+                "temperature": 0.3
+            },
+            request_options={"timeout": 60}
         )
+        
         return response.text
+        
     except Exception as e:
-        return f"Error {type(e).__name__}: {str(e)[:200]}"
-
+        return f"Error: {str(e)[:200]}"
 # Configurar la página
 st.set_page_config(
     page_title="Analizador de Datos",
