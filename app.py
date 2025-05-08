@@ -22,46 +22,27 @@ else:
 # Función para análisis con Gemini
 def generar_analisis_ia(df):
     try:
-        # Validar tamaño del dataset
-        if len(df) > 10000:
-            return "⚠️ El dataset es muy grande para análisis con IA (máximo 10,000 filas)"
-            
-        # Configurar modelo
-        genai.configure(api_key=os.getenv("GEMINI_KEY") or st.secrets.get("GEMINI_KEY"))
-        model = genai.GenerativeModel('gemini-pro')
-        
-        # Crear resumen optimizado
-        muestra = df.sample(min(3, len(df))).to_markdown()
-        resumen = f"""
-        Columnas ({len(df.columns)}): {', '.join(df.columns)}
-        Filas: {len(df):,}
-        Tipos de datos: {dict(df.dtypes)}
-        Estadísticas clave: {df.describe().loc[['mean', 'std', 'min', 'max']].to_markdown()}
-        """
-        
-        # Crear prompt eficiente
-        prompt = f"""
-        Analiza este dataset y genera un informe conciso en español con:
-        - Descripción general en 1 oración
-        - 3 hallazgos principales
-        - 2 recomendaciones de análisis
-        [Datos]: {resumen}
-        [Muestra]: {muestra}
-        """
-        
-        # Configuración de generación
+        genai.configure(
+            api_key=os.getenv("GEMINI_KEY"),
+            client_options={
+                'api_endpoint': 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
+            }
+        )
+        model = genai.GenerativeModel('gemini-2.0-flash')
+        prompt = {
+            "contents": [{
+                "parts": [{
+                    "text": f"Analiza este dataset (responde en español): Columnas: {df.columns.tolist()}. Muestra: {df.head(2).to_dict()}"
+                }]
+            }]
+        }
         response = model.generate_content(
             prompt,
-            generation_config=genai.types.GenerationConfig(
-                max_output_tokens=300,
-                temperature=0.2
-            )
+            request_options={'timeout': 60, 'retry': 3}
         )
-        
         return response.text
-        
     except Exception as e:
-        return f"❌ Error: {str(e)}"
+        return f"Error {type(e).__name__}: {str(e)[:200]}"
 
 # Configurar la página
 st.set_page_config(
