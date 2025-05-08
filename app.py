@@ -32,8 +32,8 @@ st.sidebar.header("Configuración de Datos")
 
 # Cargar datos de usuario
 uploaded_file = st.sidebar.file_uploader(
-    "Sube tu dataset (CSV o Excel)",
-    type=["csv", "xlsx"]
+    "Sube tu dataset (CSV)",
+    type=["csv"]
 )
 
 # Opciones de limpieza
