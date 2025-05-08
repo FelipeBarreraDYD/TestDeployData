@@ -24,8 +24,8 @@ def configure_genai():
 def generar_analisis_ia(df):
     try:
         model = configure_genai()
-        sample_data = df.sample(min(5, len(df))).to_dict(orient='records')
-        
+        n_samples = min(5, len(df))
+        sample_data = df.sample(n=n_samples if n_samples > 0 else 1).to_dict(orient='records') 
         prompt = f"""
         Actúa como experto en análisis de datos. Analiza este dataset:
         - Columnas ({len(df.columns)}): {', '.join(df.columns)}
