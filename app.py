@@ -16,7 +16,10 @@ def init_env():
 
 # Función para análisis con Gemini
 def generar_analisis_ia(df):
-    genai.configure(api_key=os.getenv("GEMINI_KEY"))
+    genai.configure(
+    api_key=os.getenv("GEMINI_KEY"),
+    transport='rest'
+    )
     model = genai.GenerativeModel('gemini-pro')
     texto_prompt = f"""
     Analiza este dataset en español:
