@@ -3,38 +3,61 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import os
-import time
-from dotenv import load_dotenv
 import google.generativeai as genai
+import time  # Eliminar este import si no se usa
 
-# Cargar variables de entorno
-def init_env():
-    if os.path.exists('credentials/.env'):
-        load_dotenv('credentials/.env')
-    # para despliegue en Streamlit Cloud, las variables ya estarán cargadas
+# Configuración de Gemini (versión optimizada)
+def configure_genai():
+    try:
+        genai.configure(
+            api_key=st.secrets["GEMINI_KEY"],
+            transport='rest',
+            client_options={
+                'api_endpoint': 'https://generativelanguage.googleapis.com/v1beta'
+            }
+        )
+        return genai.GenerativeModel('gemini-1.5-flash')
+    except Exception as e:
+        st.error(f"Error configurando Gemini: {str(e)}")
+        st.stop()
 
-# Función para análisis con Gemini
+# Función de análisis (versión optimizada)
 def generar_analisis_ia(df):
-    genai.configure(
-    api_key=os.getenv("GEMINI_KEY"),
-    transport='rest'
-    )
-    model = genai.GenerativeModel('gemini-pro')
-    texto_prompt = f"""
-    Analiza este dataset en español:
-    - Columnas: {', '.join(df.columns)}
-    - Muestra: {df.head(2).to_string()}
-    """
-    response = model.generate_content(
-        contents=[{"role": "user", "parts": [{"text": texto_prompt}]}],
-        generation_config={"max_output_tokens": 600, "temperature": 0.3},
-        request_options={"timeout": 1000}
-    )
-    return response.text
-
-# Cached IA para no repetir petición
-@st.cache_data(show_spinner=False)
+    try:
+        model = configure_genai()
+        sample_data = df.sample(min(5, len(df))).to_dict(orient='records')
+        
+        prompt = f"""
+        Actúa como experto en análisis de datos. Analiza este dataset:
+        - Columnas ({len(df.columns)}): {', '.join(df.columns)}
+        - Muestra aleatoria: {sample_data}
+        - Estadísticas clave: {df.describe().to_string()}
+        
+        Responde en español con formato markdown:
+        ## Análisis
+        
+        ### Descripción
+        [Breve resumen]
+        
+        ### Hallazgos
+        - [Hallazgo 1]
+        - [Hallazgo 2]
+        
+        ### Recomendaciones
+        - [Recomendación 1]
+        """
+        
+        response = model.generate_content(
+            contents=[{"role": "user", "parts": [{"text": prompt}]}],
+            generation_config={"max_output_tokens": 800, "temperature": 0.3},
+            request_options={"timeout": 60, "retry": 2}
+        )
+        return response.text
+        
+    except Exception as e:
+        return f"🚨 Error: {str(e)[:200]}... (Verifica conexión o tamaño de datos)"
+# Cache mejorado con hash de dataframe
+@st.cache_data(show_spinner=False, hash_funcs={pd.DataFrame: lambda _: None})
 def cached_ia_analysis(df):
     return generar_analisis_ia(df)
 
@@ -44,8 +67,6 @@ st.set_page_config(
     page_icon="📊",
     layout="wide"
 )
-
-init_env()
 
 # Cargar datos de ejemplo
 @st.cache_data
@@ -67,13 +88,18 @@ clean_method = st.sidebar.radio(
     ["Rellenar con 0", "Eliminar filas con NA"]
 )
 
-# Procesar datos cargados
+# Función de carga modificada para resetear el análisis previo
 def load_and_clean(uploader):
     try:
         if uploader.name.endswith('.csv'):
             df = pd.read_csv(uploader)
         else:
             df = pd.read_excel(uploader)
+        
+        # Resetear análisis anterior al cargar nuevo dataset
+        if 'ia_report' in st.session_state:
+            del st.session_state.ia_report
+            
         if clean_method == "Rellenar con 0":
             df.fillna(0, inplace=True)
         else:
@@ -83,19 +109,8 @@ def load_and_clean(uploader):
         st.sidebar.error(f"Error al cargar archivo: {str(e)}")
         return None
 
-if uploaded_file:
-    current_df = load_and_clean(uploaded_file)
-else:
-    current_df = load_sample_data()
-
-# Lanzar análisis IA en segundo plano al cargar dataset
-if current_df is not None and 'ia_report' not in st.session_state:
-    progress = st.sidebar.progress(0)
-    for pct in range(1, 101):
-        time.sleep(0.01)
-        progress.progress(pct)
-    st.session_state.ia_report = cached_ia_analysis(current_df)
-    progress.empty()
+# Cargar datos (sin ejecución automática de IA)
+current_df = load_and_clean(uploaded_file) if uploaded_file else load_sample_data()
 
 # Navbar actualizada
 page = st.sidebar.radio(
@@ -174,17 +189,37 @@ elif page == "Análisis Exploratorio":
 # Página Análisis Descriptivo
 elif page == "Análisis Descriptivo":
     st.header("Análisis Descriptivo con IA")
+    
     if current_df is None:
         st.warning("Primero carga un dataset")
     else:
-        st.spinner("Cargando informe de IA...")
-        report = st.session_state.get('ia_report', None)
-        if report:
-            st.markdown("## 📄 Informe de IA")
-            st.write(report)
-            st.caption(f"Tokens aproximados usados: {len(report)//4}")
+        # Sección de controles
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown("### Generar nuevo análisis")
+            
+            # Botón para análisis completo
+            if st.button("🧠 Ejecutar Análisis Completo con IA"):
+                with st.spinner("Analizando dataset. Esto puede tomar 1-2 minutos..."):
+                    try:
+                        st.session_state.ia_report = cached_ia_analysis(current_df)
+                        st.success("¡Análisis completado!")
+                    except Exception as e:
+                        st.error(f"Error en el análisis: {str(e)}")
+        
+        # Sección de resultados
+        if 'ia_report' in st.session_state:
+            st.markdown("---")
+            st.markdown("## 📄 Informe Generado")
+            st.markdown(st.session_state.ia_report)
+            
+            # Metadata del análisis
+            with st.expander("Detalles técnicos"):
+                st.write(f"Filas analizadas: {len(current_df)}")
+                st.write(f"Columnas analizadas: {len(current_df.columns)}")
+                st.write(f"Tamaño del informe: {len(st.session_state.ia_report)//4} tokens aproximados")
         else:
-            st.warning("El informe aún se está generando. Intenta de nuevo en unos segundos.")
+            st.info("Presiona el botón para generar un análisis con IA")
 
 # Página Acerca de
 elif page == "Acerca de":
