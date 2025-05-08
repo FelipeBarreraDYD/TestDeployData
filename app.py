@@ -4,7 +4,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import google.generativeai as genai
-import time  # Eliminar este import si no se usa
 
 # Configuración de Gemini (versión optimizada)
 def configure_genai():
