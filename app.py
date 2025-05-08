@@ -1,6 +1,6 @@
 """
-ANALIZADOR DE DATASETS CON IA
-Aplicación que analiza automáticamente cualquier dataset usando IA
+ANALIZADOR INTERACTIVO DE DATASETS
+Aplicación para explorar y visualizar cualquier conjunto de datos
 """
 
 import streamlit as st
@@ -8,183 +8,161 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import torch
-from transformers import pipeline
-from io import StringIO
+import os
+from PIL import Image
 
-# Configuración inicial
+# Configurar la página
 st.set_page_config(
-    page_title="Analizador de Datasets con IA",
-    page_icon="🤖",
+    page_title="Analizador de Datos",
+    page_icon="📊",
     layout="wide"
 )
 
-# Cargar modelo de lenguaje con manejo de errores y configuración óptima
-@st.cache_resource(show_spinner="Cargando modelo de IA...")
-def load_ai_model():
+# Cargar datos de ejemplo
+@st.cache_data
+def load_sample_data():
     try:
-        # Forzar uso de CPU y evitar dependencias de GPU
-        return pipeline(
-            task="text2text-generation",
-            model="google/flan-t5-small",
-            device_map="cpu",
-            torch_dtype=torch.float32,
-            low_cpu_mem_usage=True
-        )
-    except ImportError:
-        st.error("Se requiere PyTorch para ejecutar el modelo. Instala con: pip install torch==2.2.0+cpu")
-        st.stop()
-    except Exception as e:
-        st.error(f"Error cargando el modelo: {str(e)}")
-        st.stop()
-
-# Verificar instalación de torch antes de cargar
-try:
-    import torch
-except ImportError:
-    st.error("PyTorch no está instalado. Ejecuta: pip install torch==2.2.0+cpu")
-    st.stop()
-
-generator = load_ai_model()
-# Función para generar texto con IA
-def generate_ai_text(prompt, max_length=200):
-    try:
-        response = generator(
-            prompt,
-            max_length=max_length,
-            do_sample=True,
-            temperature=0.7
-        )
-        return response[0]['generated_text']
-    except Exception as e:
-        st.error(f"Error en la generación: {str(e)}")
-        return ""
-
-# Procesamiento de datos
-def process_data(uploaded_file):
-    try:
-        if uploaded_file.name.endswith('.csv'):
-            df = pd.read_csv(uploaded_file)
-        elif uploaded_file.name.endswith(('.xls', '.xlsx')):
-            df = pd.read_excel(uploaded_file)
-        else:
-            return None
-        
-        # Limpieza básica
-        df = df.dropna(axis=1, how='all')
-        df = df.dropna()
-        return df
-    
-    except Exception as e:
-        st.error(f"Error procesando archivo: {str(e)}")
+        return pd.read_csv('sample_data.csv')
+    except FileNotFoundError:
+        st.error("Archivo de datos de ejemplo no encontrado.")
         return None
 
-# Interfaz principal
-st.title("🤖 Analizador Inteligente de Datasets")
-st.markdown("Carga cualquier dataset y obtén un análisis automático con IA")
+# Sidebar para carga de datos y configuración
+st.sidebar.header("Configuración de Datos")
 
-# Sidebar para carga de datos
-with st.sidebar:
-    st.header("Configuración")
-    uploaded_file = st.file_uploader("Sube tu dataset", type=["csv", "xlsx"])
-    analyze_button = st.button("Analizar Dataset")
+# Cargar datos de usuario
+uploaded_file = st.sidebar.file_uploader(
+    "Sube tu dataset (CSV o Excel)",
+    type=["csv", "xlsx"]
+)
 
-# Sección de análisis
-if analyze_button and uploaded_file:
-    df = process_data(uploaded_file)
-    
-    if df is not None:
-        # Generar descripción inicial con IA
-        sample_data = df.head(3).to_csv(index=False)
-        prompt = f"""
-        Describe este dataset basado en sus primeras filas: 
-        {sample_data}
-        Columnas: {', '.join(df.columns)}
-        Características principales:
-        """
-        
-        with st.spinner("Generando análisis con IA..."):
-            ai_description = generate_ai_text(prompt)
+# Opciones de limpieza
+clean_method = st.sidebar.radio(
+    "Manejar valores faltantes:",
+    ["Rellenar con 0", "Eliminar filas con NA"]
+)
+
+# Procesar datos cargados
+current_df = None
+if uploaded_file:
+    try:
+        if uploaded_file.name.endswith('.csv'):
+            current_df = pd.read_csv(uploaded_file)
+        else:
+            current_df = pd.read_excel(uploaded_file)
             
-        st.header("Descripción General del Dataset")
-        st.write(ai_description)
+        # Aplicar limpieza
+        if clean_method == "Rellenar con 0":
+            current_df.fillna(0, inplace=True)
+        else:
+            current_df.dropna(inplace=True)
+            
+    except Exception as e:
+        st.sidebar.error(f"Error al cargar archivo: {str(e)}")
+else:
+    current_df = load_sample_data()
+
+# Título de la aplicación
+st.title("📊 Analizador Interactivo de Datasets")
+st.markdown("Explora y visualiza cualquier conjunto de datos de forma interactiva")
+
+# Sidebar para navegación
+page = st.sidebar.radio("Navegación", ["Inicio", "Análisis Exploratorio", "Acerca de"])
+
+# Página de inicio
+if page == "Inicio":
+    st.header("Bienvenido al Analizador de Datasets")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown("""
+        ### 🚀 ¿Qué puedes hacer?
         
-        # Análisis estadístico automático
-        st.header("Análisis Estadístico")
+        - **Visualizar datos** en tablas interactivas
+        - **Analizar relaciones** entre variables
+        - **Generar gráficos** profesionales
+        - **Explorar distribuciones** estadísticas
+        """)
         
+        if current_df is not None:
+            st.subheader("Vista previa de los datos")
+            st.dataframe(current_df.head())
+    
+    with col2:
+        if current_df is not None:
+            st.markdown("### 📌 Resumen Rápido")
+            st.write(f"- **Filas:** {current_df.shape[0]}")
+            st.write(f"- **Columnas:** {current_df.shape[1]}")
+            st.write(f"- **Variables numéricas:** {len(current_df.select_dtypes(include=np.number).columns)}")
+            st.write(f"- **Variables categóricas:** {len(current_df.select_dtypes(include=['object', 'category']).columns)}")
+
+# Página de análisis exploratorio
+elif page == "Análisis Exploratorio":
+    st.header("Análisis Exploratorio de Datos")
+    
+    if current_df is not None:
+        st.markdown("""
+        Explora tus datos mediante visualizaciones interactivas y análisis estadísticos
+        """)
+        
+        # Sección de estadísticas
+        st.subheader("Estadísticas Descriptivas")
+        st.dataframe(current_df.describe())
+        
+        # Matriz de correlación
+        st.subheader("Matriz de Correlación")
+        numeric_cols = current_df.select_dtypes(include=np.number).columns.tolist()
+        if len(numeric_cols) > 1:
+            corr = current_df[numeric_cols].corr()
+            fig, ax = plt.subplots(figsize=(10, 8))
+            sns.heatmap(corr, annot=True, cmap='coolwarm', fmt='.2f')
+            st.pyplot(fig)
+        else:
+            st.warning("Se necesitan al menos 2 variables numéricas para la matriz de correlación")
+        
+        # Selector de gráficos
+        st.subheader("Generador de Gráficos")
         col1, col2 = st.columns(2)
+        
         with col1:
-            st.subheader("Resumen Estadístico")
-            st.dataframe(df.describe())
+            plot_type = st.selectbox("Tipo de gráfico", 
+                                   ["Histograma", "Dispersión", "Barras"])
         
         with col2:
-            st.subheader("Tipos de Datos")
-            dtype_info = StringIO()
-            df.info(buf=dtype_info, verbose=False)
-            st.text(dtype_info.getvalue())
+            x_var = st.selectbox("Variable X", current_df.columns)
+            if plot_type != "Histograma":
+                y_var = st.selectbox("Variable Y", current_df.columns)
         
-        # Visualizaciones automáticas
-        st.header("Visualizaciones Automáticas")
-        
-        # Seleccionar columnas numéricas
-        numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
-        
-        if len(numeric_cols) >= 2:
-            # Generar matriz de correlación con descripción IA
-            corr_matrix = df[numeric_cols].corr()
+        # Generar gráficos
+        fig, ax = plt.subplots()
+        try:
+            if plot_type == "Histograma":
+                sns.histplot(current_df[x_var], kde=True, ax=ax)
+                ax.set_title(f'Distribución de {x_var}')
+            elif plot_type == "Dispersión":
+                sns.scatterplot(x=x_var, y=y_var, data=current_df, ax=ax)
+                ax.set_title(f'{x_var} vs {y_var}')
+            elif plot_type == "Barras":
+                sns.barplot(x=x_var, y=y_var, data=current_df, ax=ax)
+                ax.set_title(f'{x_var} vs {y_var}')
             
-            fig, ax = plt.subplots(figsize=(10, 8))
-            sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', ax=ax)
-            st.subheader("Matriz de Correlación")
             st.pyplot(fig)
-            
-            corr_prompt = f"""
-            Explica esta matriz de correlación entre las variables numéricas: 
-            {', '.join(numeric_cols)}. 
-            Destaca las correlaciones más importantes.
-            """
-            corr_analysis = generate_ai_text(corr_prompt)
-            st.write(corr_analysis)
-        
-        # Histogramas automáticos
-        if numeric_cols:
-            selected_col = st.selectbox("Selecciona una columna para histograma", numeric_cols)
-            
-            fig, ax = plt.subplots()
-            sns.histplot(df[selected_col], kde=True, ax=ax)
-            st.pyplot(fig)
-            
-            hist_prompt = f"""
-            Analiza la distribución de la columna {selected_col} basado en su histograma.
-            """
-            hist_analysis = generate_ai_text(hist_prompt)
-            st.write(hist_analysis)
-        
-        # Análisis de variables categóricas
-        categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-        
-        if categorical_cols:
-            st.subheader("Análisis de Variables Categóricas")
-            selected_cat = st.selectbox("Selecciona columna categórica", categorical_cols)
-            
-            fig, ax = plt.subplots()
-            df[selected_cat].value_counts().plot(kind='bar', ax=ax)
-            st.pyplot(fig)
-            
-            cat_prompt = f"""
-            Analiza la distribución de la variable categórica {selected_cat} 
-            basado en su gráfico de barras.
-            """
-            cat_analysis = generate_ai_text(cat_prompt)
-            st.write(cat_analysis)
+        except Exception as e:
+            st.error(f"Error al generar gráfico: {str(e)}")
 
-elif analyze_button and not uploaded_file:
-    st.warning("Por favor sube un archivo primero")
-
-else:
-    st.info("""
-    Instrucciones:
-    1. Sube tu dataset (CSV o Excel)
-    2. Haz clic en 'Analizar Dataset'
-    3. Espera los resultados generados por IA
+# Página Acerca de
+elif page == "Acerca de":
+    st.header("Acerca de la Aplicación")
+    st.markdown("""
+    ### Características Principales:
+    - **Carga múltiples formatos:** CSV y Excel
+    - **Limpieza automática:** Manejo de valores faltantes
+    - **Visualización interactiva:** Gráficos personalizables
+    - **Análisis estadístico:** Informes descriptivos completos
+    
+    Desarrollado con Streamlit y Python 🐍
     """)
+
+if __name__ == "__main__":
+    pass
