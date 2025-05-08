@@ -53,7 +53,7 @@ def generar_analisis_ia(df):
         )
         print(f"Tipo de response: {type(response)}")
         print(f"Contenido de response: {response}")
-        return response.text
+        return response
         
     except Exception as e:
         return f"🚨 Error: {str(e)[:200]} {type(response)} {response} ... (Verifica conexión o tamaño de datos)"
