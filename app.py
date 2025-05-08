@@ -51,6 +51,8 @@ def generar_analisis_ia(df):
             generation_config={"max_output_tokens": 800, "temperature": 0.3},
             request_options={"timeout": 60, "retry": 2}
         )
+        print(f"Tipo de response: {type(response)}")
+        print(f"Contenido de response: {response}")
         return response.text
         
     except Exception as e:
