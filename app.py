@@ -1,62 +1,48 @@
-"""
-ANALIZADOR INTERACTIVO DE DATASETS
-Aplicación para explorar y visualizar cualquier conjunto de datos
-"""
-
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
+import time
 from dotenv import load_dotenv
 import google.generativeai as genai
 
 # Cargar variables de entorno
-if os.path.exists('credentials/.env'):
-    load_dotenv('credentials/.env')
-else:
-    # Para despliegue en Streamlit Cloud
-    pass
+def init_env():
+    if os.path.exists('credentials/.env'):
+        load_dotenv('credentials/.env')
+    # para despliegue en Streamlit Cloud, las variables ya estarán cargadas
 
 # Función para análisis con Gemini
 def generar_analisis_ia(df):
-    try:
-        # 1. Configurar con modelo válido
-        genai.configure(api_key=os.getenv("GEMINI_KEY"))
-        model = genai.GenerativeModel('gemini-pro')  # Modelo comprobado
-        
-        # 2. Crear prompt con estructura correcta
-        texto_prompt = f"""
-        Analiza este dataset en español:
-        - Columnas: {', '.join(df.columns)}
-        - Muestra: {df.head(2).to_string()}
-        """
-        # 3. Formato correcto usando la API de Python
-        response = model.generate_content(
-            contents=[
-                {
-                    "role": "user",
-                    "parts": [{"text": texto_prompt}]
-                }
-            ],
-            generation_config={
-                "max_output_tokens": 500,
-                "temperature": 0.3
-            },
-            request_options={"timeout": 60}
-        )
-        
-        return response.text
-        
-    except Exception as e:
-        return f"Error: {str(e)[:200]}"
+    genai.configure(api_key=os.getenv("GEMINI_KEY"))
+    model = genai.GenerativeModel('gemini-pro')
+    texto_prompt = f"""
+    Analiza este dataset en español:
+    - Columnas: {', '.join(df.columns)}
+    - Muestra: {df.head(2).to_string()}
+    """
+    response = model.generate_content(
+        contents=[{"role": "user", "parts": [{"text": texto_prompt}]}],
+        generation_config={"max_output_tokens": 600, "temperature": 0.3},
+        request_options={"timeout": 1000}
+    )
+    return response.text
+
+# Cached IA para no repetir petición
+@st.cache_data(show_spinner=False)
+def cached_ia_analysis(df):
+    return generar_analisis_ia(df)
+
 # Configurar la página
 st.set_page_config(
     page_title="Analizador de Datos",
     page_icon="📊",
     layout="wide"
 )
+
+init_env()
 
 # Cargar datos de ejemplo
 @st.cache_data
@@ -67,114 +53,106 @@ def load_sample_data():
         st.error("Archivo de datos de ejemplo no encontrado.")
         return None
 
-# Sidebar para carga de datos y configuración
+# Sidebar configuración y carga de datos
 st.sidebar.header("Configuración de Datos")
-
-# Cargar datos de usuario
 uploaded_file = st.sidebar.file_uploader(
     "Sube tu dataset (CSV)",
     type=["csv"]
 )
-
-# Opciones de limpieza
 clean_method = st.sidebar.radio(
     "Manejar valores faltantes:",
     ["Rellenar con 0", "Eliminar filas con NA"]
 )
 
 # Procesar datos cargados
-current_df = None
-if uploaded_file:
+def load_and_clean(uploader):
     try:
-        if uploaded_file.name.endswith('.csv'):
-            current_df = pd.read_csv(uploaded_file)
+        if uploader.name.endswith('.csv'):
+            df = pd.read_csv(uploader)
         else:
-            current_df = pd.read_excel(uploaded_file)
-            
-        # Aplicar limpieza
+            df = pd.read_excel(uploader)
         if clean_method == "Rellenar con 0":
-            current_df.fillna(0, inplace=True)
+            df.fillna(0, inplace=True)
         else:
-            current_df.dropna(inplace=True)
-            
+            df.dropna(inplace=True)
+        return df
     except Exception as e:
         st.sidebar.error(f"Error al cargar archivo: {str(e)}")
+        return None
+
+if uploaded_file:
+    current_df = load_and_clean(uploaded_file)
 else:
     current_df = load_sample_data()
+
+# Lanzar análisis IA en segundo plano al cargar dataset
+if current_df is not None and 'ia_report' not in st.session_state:
+    progress = st.sidebar.progress(0)
+    for pct in range(1, 101):
+        time.sleep(0.01)
+        progress.progress(pct)
+    st.session_state.ia_report = cached_ia_analysis(current_df)
+    progress.empty()
+
+# Navbar actualizada
+page = st.sidebar.radio(
+    "Navegación",
+    ["Inicio", "Análisis Exploratorio", "Análisis Descriptivo", "Acerca de"]
+)
 
 # Título de la aplicación
 st.title("📊 Analizador Interactivo de Datasets")
 st.markdown("Explora y visualiza cualquier conjunto de datos de forma interactiva")
 
-# Sidebar para navegación
-page = st.sidebar.radio("Navegación", ["Inicio", "Análisis Exploratorio", "Acerca de"])
-
-# Página de inicio
+# Página Inicio
 if page == "Inicio":
     st.header("Bienvenido al Analizador de Datasets")
-    
     col1, col2 = st.columns([2, 1])
-    
     with col1:
         st.markdown("""
         ### 🚀 ¿Qué puedes hacer?
-        
         - **Visualizar datos** en tablas interactivas
         - **Analizar relaciones** entre variables
         - **Generar gráficos** profesionales
         - **Explorar distribuciones** estadísticas
-        """)
-        
+        """
+        )
         if current_df is not None:
             st.subheader("Vista previa de los datos")
             st.dataframe(current_df.head())
-    
     with col2:
         if current_df is not None:
             st.markdown("### 📌 Resumen Rápido")
             st.write(f"- **Filas:** {current_df.shape[0]}")
             st.write(f"- **Columnas:** {current_df.shape[1]}")
             st.write(f"- **Variables numéricas:** {len(current_df.select_dtypes(include=np.number).columns)}")
-            st.write(f"- **Variables categóricas:** {len(current_df.select_dtypes(include=['object', 'category']).columns)}")
+            st.write(f"- **Variables categóricas:** {len(current_df.select_dtypes(include=['object','category']).columns)}")
 
-# Página de análisis exploratorio
+# Página Análisis Exploratorio
 elif page == "Análisis Exploratorio":
     st.header("Análisis Exploratorio de Datos")
-    
     if current_df is not None:
-        st.markdown("""
-        Explora tus datos mediante visualizaciones interactivas y análisis estadísticos
-        """)
-        
-        # Sección de estadísticas
+        st.markdown("Explora tus datos mediante visualizaciones interactivas y análisis estadísticos")
         st.subheader("Estadísticas Descriptivas")
         st.dataframe(current_df.describe())
-        
-        # Matriz de correlación
         st.subheader("Matriz de Correlación")
-        numeric_cols = current_df.select_dtypes(include=np.number).columns.tolist()
-        if len(numeric_cols) > 1:
-            corr = current_df[numeric_cols].corr()
-            fig, ax = plt.subplots(figsize=(10, 8))
+        num_cols = current_df.select_dtypes(include=np.number).columns.tolist()
+        if len(num_cols) > 1:
+            corr = current_df[num_cols].corr()
+            fig, ax = plt.subplots(figsize=(10,8))
             sns.heatmap(corr, annot=True, cmap='coolwarm', fmt='.2f')
             st.pyplot(fig)
         else:
             st.warning("Se necesitan al menos 2 variables numéricas para la matriz de correlación")
-        
-        # Selector de gráficos
         st.subheader("Generador de Gráficos")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            plot_type = st.selectbox("Tipo de gráfico", 
-                                   ["Histograma", "Dispersión", "Barras"])
-        
-        with col2:
+        c1, c2 = st.columns(2)
+        with c1:
+            plot_type = st.selectbox("Tipo de gráfico", ["Histograma","Dispersión","Barras"])
+        with c2:
             x_var = st.selectbox("Variable X", current_df.columns)
+            y_var = None
             if plot_type != "Histograma":
                 y_var = st.selectbox("Variable Y", current_df.columns)
-        
-        # Generar gráficos
         fig, ax = plt.subplots()
         try:
             if plot_type == "Histograma":
@@ -183,27 +161,27 @@ elif page == "Análisis Exploratorio":
             elif plot_type == "Dispersión":
                 sns.scatterplot(x=x_var, y=y_var, data=current_df, ax=ax)
                 ax.set_title(f'{x_var} vs {y_var}')
-            elif plot_type == "Barras":
+            else:
                 sns.barplot(x=x_var, y=y_var, data=current_df, ax=ax)
                 ax.set_title(f'{x_var} vs {y_var}')
-            
             st.pyplot(fig)
         except Exception as e:
             st.error(f"Error al generar gráfico: {str(e)}")
-        
-        # Análisis con IA
-        if st.button("🧠 Generar Análisis con IA"):
-            if current_df is not None:
-                with st.spinner("Analizando con IA (esto puede tomar 20 segundos)..."):
-                    analisis = generar_analisis_ia(current_df)
-                    st.markdown("## 📄 Informe de IA")
-                    st.write(analisis)
-                    
-                    # Estimación de tokens
-                    tokens = len(analisis) // 4
-                    st.caption(f"Tokens aproximados usados: {tokens}")
-            else:
-                st.warning("Primero carga un dataset")
+
+# Página Análisis Descriptivo
+elif page == "Análisis Descriptivo":
+    st.header("Análisis Descriptivo con IA")
+    if current_df is None:
+        st.warning("Primero carga un dataset")
+    else:
+        st.spinner("Cargando informe de IA...")
+        report = st.session_state.get('ia_report', None)
+        if report:
+            st.markdown("## 📄 Informe de IA")
+            st.write(report)
+            st.caption(f"Tokens aproximados usados: {len(report)//4}")
+        else:
+            st.warning("El informe aún se está generando. Intenta de nuevo en unos segundos.")
 
 # Página Acerca de
 elif page == "Acerca de":
@@ -214,9 +192,11 @@ elif page == "Acerca de":
     - **Limpieza automática:** Manejo de valores faltantes
     - **Visualización interactiva:** Gráficos personalizables
     - **Análisis estadístico:** Informes descriptivos completos
-    
+    - **Análisis IA automatizado:** Se ejecuta al cargar datos
+
     Desarrollado con Streamlit y Python 🐍
-    """)
+    """
+    )
 
 if __name__ == "__main__":
     pass
