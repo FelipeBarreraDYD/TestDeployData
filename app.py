@@ -11,7 +11,6 @@ import seaborn as sns
 import os
 from dotenv import load_dotenv
 import google.generativeai as genai
-from PIL import Image
 
 # Cargar variables de entorno
 if os.path.exists('credentials/.env'):
