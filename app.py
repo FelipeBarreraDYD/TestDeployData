@@ -51,12 +51,10 @@ def generar_analisis_ia(df):
             generation_config={"max_output_tokens": 800, "temperature": 0.3},
             request_options={"timeout": 60, "retry": 2}
         )
-        print(f"Tipo de response: {type(response)}")
-        print(f"Contenido de response: {response}")
-        return response
+        return response.text
         
     except Exception as e:
-        return f"🚨 Error: {str(e)[:200]} {type(response)} {response} ... (Verifica conexión o tamaño de datos)"
+        return f"🚨 Error: {str(e)[:200]}... (Verifica conexión o tamaño de datos)"
 # Cache mejorado con hash de dataframe
 @st.cache_data(show_spinner=False, hash_funcs={pd.DataFrame: lambda _: None})
 def cached_ia_analysis(df):
