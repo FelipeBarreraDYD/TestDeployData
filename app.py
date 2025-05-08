@@ -24,8 +24,7 @@ def configure_genai():
 def generar_analisis_ia(df):
     try:
         model = configure_genai()
-        n_samples = min(5, len(df))
-        sample_data = df.sample(n=n_samples if n_samples > 0 else 1).to_dict(orient='records') 
+        sample_data = df.sample(min(5, len(df))).to_dict(orient='records')
         prompt = f"""
         Actúa como experto en análisis de datos. Analiza este dataset:
         - Columnas ({len(df.columns)}): {', '.join(df.columns)}
@@ -54,6 +53,10 @@ def generar_analisis_ia(df):
         return response.text
         
     except Exception as e:
+        # Añade esta línea para imprimir el error completo en la consola/logs de Streamlit
+        print("Detalle completo del error en generar_analisis_ia:")
+        print(e)
+        st.error(f"🚨 Error en el análisis: {str(e)}") # Puedes usar st.error para mostrarlo en la app también
         return f"🚨 Error: {str(e)[:200]}... (Verifica conexión o tamaño de datos)"
 # Cache mejorado con hash de dataframe
 @st.cache_data(show_spinner=False, hash_funcs={pd.DataFrame: lambda _: None})
