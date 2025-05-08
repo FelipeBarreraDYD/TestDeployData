@@ -1,0 +1,6 @@
+# Archivos a ignorar
+credentials/.env
+*.pyc
+__pycache__/
+*.csv
+*.xlsx

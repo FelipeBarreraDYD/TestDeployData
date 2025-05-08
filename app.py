@@ -9,7 +9,60 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
+from dotenv import load_dotenv
+import google.generativeai as genai
 from PIL import Image
+
+# Cargar variables de entorno
+if os.path.exists('credentials/.env'):
+    load_dotenv('credentials/.env')
+else:
+    # Para despliegue en Streamlit Cloud
+    pass
+
+# Función para análisis con Gemini
+def generar_analisis_ia(df):
+    try:
+        # Validar tamaño del dataset
+        if len(df) > 10000:
+            return "⚠️ El dataset es muy grande para análisis con IA (máximo 10,000 filas)"
+            
+        # Configurar modelo
+        genai.configure(api_key=os.getenv("GEMINI_KEY") or st.secrets.get("GEMINI_KEY"))
+        model = genai.GenerativeModel('gemini-pro')
+        
+        # Crear resumen optimizado
+        muestra = df.sample(min(3, len(df))).to_markdown()
+        resumen = f"""
+        Columnas ({len(df.columns)}): {', '.join(df.columns)}
+        Filas: {len(df):,}
+        Tipos de datos: {dict(df.dtypes)}
+        Estadísticas clave: {df.describe().loc[['mean', 'std', 'min', 'max']].to_markdown()}
+        """
+        
+        # Crear prompt eficiente
+        prompt = f"""
+        Analiza este dataset y genera un informe conciso en español con:
+        - Descripción general en 1 oración
+        - 3 hallazgos principales
+        - 2 recomendaciones de análisis
+        [Datos]: {resumen}
+        [Muestra]: {muestra}
+        """
+        
+        # Configuración de generación
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                max_output_tokens=300,
+                temperature=0.2
+            )
+        )
+        
+        return response.text
+        
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
 
 # Configurar la página
 st.set_page_config(
@@ -150,6 +203,20 @@ elif page == "Análisis Exploratorio":
             st.pyplot(fig)
         except Exception as e:
             st.error(f"Error al generar gráfico: {str(e)}")
+        
+        # Análisis con IA
+        if st.button("🧠 Generar Análisis con IA"):
+            if current_df is not None:
+                with st.spinner("Analizando con IA (esto puede tomar 20 segundos)..."):
+                    analisis = generar_analisis_ia(current_df)
+                    st.markdown("## 📄 Informe de IA")
+                    st.write(analisis)
+                    
+                    # Estimación de tokens
+                    tokens = len(analisis) // 4
+                    st.caption(f"Tokens aproximados usados: {tokens}")
+            else:
+                st.warning("Primero carga un dataset")
 
 # Página Acerca de
 elif page == "Acerca de":
