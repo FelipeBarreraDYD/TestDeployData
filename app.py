@@ -56,7 +56,7 @@ def generar_analisis_ia(df):
         return response.text
         
     except Exception as e:
-        return f"🚨 Error: {str(e)[:200]}... (Verifica conexión o tamaño de datos)"
+        return f"🚨 Error: {str(e)[:200]} {type(response)} {response} ... (Verifica conexión o tamaño de datos)"
 # Cache mejorado con hash de dataframe
 @st.cache_data(show_spinner=False, hash_funcs={pd.DataFrame: lambda _: None})
 def cached_ia_analysis(df):
