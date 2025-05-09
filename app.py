@@ -5,14 +5,21 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from transformers import pipeline
 
-# Configuración del modelo local
+# Configuración de página DEBE SER LA PRIMERA LÍNEA
+st.set_page_config(
+    page_title="Analizador de Datos",
+    page_icon="📊",
+    layout="wide"
+)
+
+# Cargar modelo de IA local compatible
 @st.cache_resource
 def load_ai_model():
     try:
         return pipeline(
             task="text-generation",
-            model="google/flan-t5-base",  # Modelo rápido y ligero
-            device=-1  # Usar CPU
+            model="PlanTL-GOB-ES/gpt2-base-bne",  # Modelo compatible en inglés
+            device=-1
         )
     except Exception as e:
         st.error(f"Error cargando el modelo: {str(e)}")
@@ -23,17 +30,16 @@ generator = load_ai_model()
 # Función de análisis optimizada
 def generar_analisis_ia(df):
     try:
-        # Limitar a 1000 caracteres para eficiencia
         sample_data = df.head(3).to_string(max_colwidth=20, max_rows=3)
         
         prompt = f"""
-        Analiza este dataset:
+        Analiza este dataset en español:
         Columnas: {', '.join(df.columns)}
         Muestra: {sample_data}
-        
-        Genera un informe breve en español con:
+
+        Genera un informe con:
         1. Descripción general
-        2. Dos hallazgos importantes
+        2. Dos hallazgos clave
         3. Una recomendación de análisis
         """
         
