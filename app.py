@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from huggingface_hub import InferenceApi
+from huggingface_hub import InferenceClient
 
 # Configuración de página DEBE SER LA PRIMERA LÍNEA
 st.set_page_config(
@@ -13,44 +13,47 @@ st.set_page_config(
 )
 
 @st.cache_resource
-def get_inference_client() -> InferenceApi:
-    HF_TOKEN = st.secrets["HF_API_TOKEN"]
-    return InferenceApi(repo_id="Qwen/Qwen2.5-7B-Instruct", token=HF_TOKEN)
+def get_inference_client() -> InferenceClient:
+    """
+    Crea y cachea el cliente de la Inference API para Qwen2.5.
+    """
+    hf_token = st.secrets["HF_API_TOKEN"]
+    return InferenceClient(
+        provider="together",
+        api_key=hf_token,
+        model="Qwen/Qwen2.5-7B-Instruct",
+        timeout=60
+    )
 
 inference = get_inference_client()
 
 @st.cache_data(show_spinner=False)
 def analisis_con_api(df: pd.DataFrame) -> str:
-    try:
-        # 1. Formatear prompt
-        muestra = df.head(3).to_markdown()
-        prompt = (
-            "<|im_start|>system\n"
+    client = get_inference_client()
+
+    # 1. Formatear mensajes para la API de chat
+    muestra = df.head(3).to_markdown()
+    messages = [
+        {"role": "system", "content": (
             "Eres un experto en análisis de datasets educativos. "
-            "Analiza esta muestra:\n\n"
-            f"{muestra}\n\n"
+            f"Analiza esta muestra:\n\n{muestra}"
+        )},
+        {"role": "user", "content": (
             "Genera en español:\n"
             "1. Dos hallazgos clave\n"
-            "2. Una recomendación práctica\n"
-            "<|im_end|>\n"
-            "<|im_start|>assistant\n"
-        )
+            "2. Una recomendación práctica"
+        )}
+    ]
 
-        # 2. Llamada a la API con parámetros
-        response = inference(
-            inputs=prompt,
-            parameters={
-                "max_new_tokens": 500,
-                "temperature": 0.3
-            }
-        )
+    # 2. Llamada al endpoint de chat completions
+    completion = client.chat.completions.create(
+        messages=messages,
+        max_tokens=500,       # equivale a max_new_tokens
+        temperature=0.3       # controla creatividad
+    )
 
-        # 3. Procesar output
-        # La API devuelve una lista de dicts con 'generated_text'
-        return response[0]["generated_text"]
-
-    except Exception as e:
-        return f"Error en la API: {e}"
+    # 3. Extraer el contenido de la respuesta
+    return completion.choices[0].message.content
 
 # Cargar datos de ejemplo
 @st.cache_data
