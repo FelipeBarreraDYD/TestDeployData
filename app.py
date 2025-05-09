@@ -3,8 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from huggingface_hub import InferenceApi
 
 # Configuración de página DEBE SER LA PRIMERA LÍNEA
 st.set_page_config(
@@ -14,77 +13,44 @@ st.set_page_config(
 )
 
 @st.cache_resource
-def load_ai_model():
-    try:
-        model_id = "Qwen/Qwen2.5-7B-Instruct"
-        # 1. Carga el modelo de causal LM con dtype y device_map automáticos
-        model = AutoModelForCausalLM.from_pretrained(
-            model_id,
-            torch_dtype=torch.bfloat16,   # en GPU; en CPU usa torch.float32 o "auto"
-            device_map="auto",            # distribuye en GPUs disponibles :contentReference[oaicite:0]{index=0}
-            trust_remote_code=True        # necesario para repositorios con código custom :contentReference[oaicite:1]{index=1}
-        )
-        # 2. Carga el tokenizer correspondiente
-        tokenizer = AutoTokenizer.from_pretrained(model_id)
-        # 3. Crea el pipeline de generación de texto
-        return pipeline(
-            "text-generation",
-            model=model,
-            tokenizer=tokenizer,
-            # Puedes ajustar estos valores por defecto si lo prefieres:
-            # max_new_tokens=600, temperature=0.3, do_sample=True, num_beams=3
-        )
-    except Exception as e:
-        st.error(f"Error cargando el modelo Qwen2.5: {e}")
-        st.stop()
+def get_inference_client() -> InferenceApi:
+    HF_TOKEN = st.secrets["HF_API_TOKEN"]
+    return InferenceApi(repo_id="Qwen/Qwen2.5-7B-Instruct", token=HF_TOKEN)
 
-# Instancia única cacheada
-generator = load_ai_model()
+inference = get_inference_client()
 
-# Función de análisis optimizada
-def generar_analisis_ia(df):
-    try:
-        model = generator
-        sample_data = df.head(2).to_markdown()
-        prompt = f"""
-        Eres un experto en análisis de datos educativos. Analiza este dataset:
-        
-        [Columnas]
-        {', '.join(df.columns)}
-        
-        [Muestra de datos]
-        {sample_data}
-        
-        [Instrucciones]
-        Genera un informe en español con este formato:
-        1. **Descripción general**: Resumen del propósito del dataset
-        2. **Hallazgos clave**: Dos patrones importantes en los datos
-        3. **Recomendación**: Sugerencia para mejorar el rendimiento académico
-        
-        [Ejemplo de respuesta]
-        1. **Descripción general**: El dataset contiene información sobre hábitos de estudio y rendimiento académico de estudiantes universitarios.
-        2. **Hallazgos clave**: 
-        - Los estudiantes que duermen más de 7 horas tienen mejores calificaciones
-        - El uso excesivo de redes sociales correlaciona con menor asistencia
-        3. **Recomendación**: Implementar talleres de gestión del tiempo
-        """
-        # 4. Configuración de generación optimizada
-        response = model(
-            prompt,
-            max_new_tokens=600,
-            temperature=0.3,
-            do_sample=True,
-            num_beams=3
-        )
-        return response[0]['generated_text']
-
-    except Exception as e:
-        return f"Error: {str(e)[:200]}"
-
-# Cache mejorado
 @st.cache_data(show_spinner=False)
-def cached_ia_analysis(df):
-    return generar_analisis_ia(df)
+def analisis_con_api(df: pd.DataFrame) -> str:
+    try:
+        # 1. Formatear prompt
+        muestra = df.head(3).to_markdown()
+        prompt = (
+            "<|im_start|>system\n"
+            "Eres un experto en análisis de datasets educativos. "
+            "Analiza esta muestra:\n\n"
+            f"{muestra}\n\n"
+            "Genera en español:\n"
+            "1. Dos hallazgos clave\n"
+            "2. Una recomendación práctica\n"
+            "<|im_end|>\n"
+            "<|im_start|>assistant\n"
+        )
+
+        # 2. Llamada a la API con parámetros
+        response = inference(
+            inputs=prompt,
+            parameters={
+                "max_new_tokens": 500,
+                "temperature": 0.3
+            }
+        )
+
+        # 3. Procesar output
+        # La API devuelve una lista de dicts con 'generated_text'
+        return response[0]["generated_text"]
+
+    except Exception as e:
+        return f"Error en la API: {e}"
 
 # Cargar datos de ejemplo
 @st.cache_data
@@ -220,7 +186,7 @@ elif page == "Análisis Descriptivo":
             if st.button("🧠 Ejecutar Análisis Completo con IA"):
                 with st.spinner("Analizando dataset. Esto puede tomar 1-2 minutos..."):
                     try:
-                        st.session_state.ia_report = cached_ia_analysis(current_df)
+                        st.session_state.ia_report = analisis_con_api(current_df)
                         st.success("¡Análisis completado!")
                     except Exception as e:
                         st.error(f"Error en el análisis: {str(e)}")
