@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import torch
-from transformers import pipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
 # Configuración de página DEBE SER LA PRIMERA LÍNEA
 st.set_page_config(
@@ -16,19 +16,29 @@ st.set_page_config(
 @st.cache_resource
 def load_ai_model():
     try:
-        import torch
-        # Carga y cachea el pipeline de Llama 3.1
+        model_id = "Qwen/Qwen2.5-7B-Instruct"
+        # 1. Carga el modelo de causal LM con dtype y device_map automáticos
+        model = AutoModelForCausalLM.from_pretrained(
+            model_id,
+            torch_dtype=torch.bfloat16,   # en GPU; en CPU usa torch.float32 o "auto"
+            device_map="auto",            # distribuye en GPUs disponibles :contentReference[oaicite:0]{index=0}
+            trust_remote_code=True        # necesario para repositorios con código custom :contentReference[oaicite:1]{index=1}
+        )
+        # 2. Carga el tokenizer correspondiente
+        tokenizer = AutoTokenizer.from_pretrained(model_id)
+        # 3. Crea el pipeline de generación de texto
         return pipeline(
-            task="text-generation",
-            model="meta-llama/Meta-Llama-3.1-8B-Instruct",
-            model_kwargs={"torch_dtype": torch.bfloat16},  # usar float32 si en CPU
-            device_map="auto",                            # o device=-1 para CPU
-            trust_remote_code=True                        # habilita código personalizado
+            "text-generation",
+            model=model,
+            tokenizer=tokenizer,
+            # Puedes ajustar estos valores por defecto si lo prefieres:
+            # max_new_tokens=600, temperature=0.3, do_sample=True, num_beams=3
         )
     except Exception as e:
-        st.error(f"Error cargando el modelo: {e}")
+        st.error(f"Error cargando el modelo Qwen2.5: {e}")
         st.stop()
 
+# Instancia única cacheada
 generator = load_ai_model()
 
 # Función de análisis optimizada
