@@ -36,19 +36,20 @@ def analisis_con_api(df: pd.DataFrame) -> str:
     messages = [
         {"role": "system", "content": (
             "Eres un experto en análisis de datasets educativos. "
-            f"Analiza esta muestra:\n\n{muestra}"
+            f"Analiza este describe del dataset:\n\n{df.describe().to_markdown()}"
+            f"para que lo entiendas mejor mira esta pequeña muestra:\n\n{muestra}"
         )},
         {"role": "user", "content": (
             "Genera en español:\n"
-            "1. Dos hallazgos clave\n"
-            "2. Una recomendación práctica"
+            "1. Descripción general de las estadísticas\n"
+            "2. Dos hallazgos clave"
         )}
     ]
 
     # 2. Llamada al endpoint de chat completions
     completion = client.chat.completions.create(
         messages=messages,
-        max_tokens=500,       # equivale a max_new_tokens
+        max_tokens=800,       # equivale a max_new_tokens
         temperature=0.3       # controla creatividad
     )
 
