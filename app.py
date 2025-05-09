@@ -30,28 +30,47 @@ generator = load_ai_model()
 # Función de análisis optimizada
 def generar_analisis_ia(df):
     try:
-        sample_data = df.head(3).to_string(max_colwidth=20, max_rows=3)
-        
+        # 1. Usar modelo en español especializado
+        model = pipeline(
+            task="text2text-generation",
+            model="Recognai/gelectra-base-instruct",
+            device=-1
+        )
+        # 2. Limitar y formatear datos de muestra
+        sample_data = df.head(2).to_markdown()
+        # 3. Prompt estructurado con ejemplo
         prompt = f"""
-        Analiza este dataset en español:
-        Columnas: {', '.join(df.columns)}
-        Muestra: {sample_data}
-
-        Genera un informe con:
-        1. Descripción general
-        2. Dos hallazgos clave
-        3. Una recomendación de análisis
-        """
+        Eres un experto en análisis de datos educativos. Analiza este dataset:
         
-        response = generator(
+        [Columnas]
+        {', '.join(df.columns)}
+        
+        [Muestra de datos]
+        {sample_data}
+        
+        [Instrucciones]
+        Genera un informe en español con este formato:
+        1. **Descripción general**: Resumen del propósito del dataset
+        2. **Hallazgos clave**: Dos patrones importantes en los datos
+        3. **Recomendación**: Sugerencia para mejorar el rendimiento académico
+        
+        [Ejemplo de respuesta]
+        1. **Descripción general**: El dataset contiene información sobre hábitos de estudio y rendimiento académico de estudiantes universitarios.
+        2. **Hallazgos clave**: 
+        - Los estudiantes que duermen más de 7 horas tienen mejores calificaciones
+        - El uso excesivo de redes sociales correlaciona con menor asistencia
+        3. **Recomendación**: Implementar talleres de gestión del tiempo
+        """
+        # 4. Configuración de generación optimizada
+        response = model(
             prompt,
-            max_length=500,
+            max_length=600,
+            temperature=0.3,
             do_sample=True,
-            temperature=0.7,
-            num_return_sequences=1
+            num_beams=3
         )
         return response[0]['generated_text']
-        
+
     except Exception as e:
         return f"Error: {str(e)[:200]}"
 
