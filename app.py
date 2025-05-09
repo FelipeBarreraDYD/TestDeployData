@@ -3,63 +3,54 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import google.generativeai as genai
+from transformers import pipeline
 
-# Configuración de Gemini (versión optimizada)
-def configure_genai():
+# Configuración del modelo local
+@st.cache_resource
+def load_ai_model():
     try:
-        genai.configure(
-            api_key=st.secrets["GEMINI_KEY"],
-            transport='rest',
-            client_options={
-                'api_endpoint': 'https://generativelanguage.googleapis.com/v1beta'
-            }
+        return pipeline(
+            task="text-generation",
+            model="google/flan-t5-base",  # Modelo rápido y ligero
+            device=-1  # Usar CPU
         )
-        return genai.GenerativeModel('gemini-1.5-flash')
     except Exception as e:
-        st.error(f"Error configurando Gemini: {str(e)}")
+        st.error(f"Error cargando el modelo: {str(e)}")
         st.stop()
 
-# Función de análisis (versión optimizada)
+generator = load_ai_model()
+
+# Función de análisis optimizada
 def generar_analisis_ia(df):
     try:
-        model = configure_genai()
-        sample_data = df.sample(min(5, len(df))).to_dict(orient='records')
+        # Limitar a 1000 caracteres para eficiencia
+        sample_data = df.head(3).to_string(max_colwidth=20, max_rows=3)
+        
         prompt = f"""
-        Actúa como experto en análisis de datos. Analiza este dataset:
-        - Columnas ({len(df.columns)}): {', '.join(df.columns)}
-        - Muestra aleatoria: {sample_data}
-        - Estadísticas clave: {df.describe().to_string()}
+        Analiza este dataset:
+        Columnas: {', '.join(df.columns)}
+        Muestra: {sample_data}
         
-        Responde en español con formato markdown:
-        ## Análisis
-        
-        ### Descripción
-        [Breve resumen]
-        
-        ### Hallazgos
-        - [Hallazgo 1]
-        - [Hallazgo 2]
-        
-        ### Recomendaciones
-        - [Recomendación 1]
+        Genera un informe breve en español con:
+        1. Descripción general
+        2. Dos hallazgos importantes
+        3. Una recomendación de análisis
         """
         
-        response = model.generate_content(
-            contents=[{"role": "user", "parts": [{"text": prompt}]}],
-            generation_config={"max_output_tokens": 800, "temperature": 0.3},
-            request_options={"timeout": 60, "retry": 2}
+        response = generator(
+            prompt,
+            max_length=500,
+            do_sample=True,
+            temperature=0.7,
+            num_return_sequences=1
         )
-        return response.text
+        return response[0]['generated_text']
         
     except Exception as e:
-        # Añade esta línea para imprimir el error completo en la consola/logs de Streamlit
-        print("Detalle completo del error en generar_analisis_ia:")
-        print(e)
-        st.error(f"🚨 Error en el análisis: {str(e)}") # Puedes usar st.error para mostrarlo en la app también
-        return f"🚨 Error: {str(e)[:200]}... (Verifica conexión o tamaño de datos)"
-# Cache mejorado con hash de dataframe
-@st.cache_data(show_spinner=False, hash_funcs={pd.DataFrame: lambda _: None})
+        return f"Error: {str(e)[:200]}"
+
+# Cache mejorado
+@st.cache_data(show_spinner=False)
 def cached_ia_analysis(df):
     return generar_analisis_ia(df)
 
