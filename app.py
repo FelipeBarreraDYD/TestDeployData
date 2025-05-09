@@ -18,7 +18,7 @@ def load_ai_model():
     try:
         return pipeline(
             task="text-generation",
-            model="PlanTL-GOB-ES/gpt2-base-bne",  # Modelo compatible en inglés
+            model="PlanTL-GOB-ES/gpt2-base-bne",  # Modelo compatible en Español
             device=-1
         )
     except Exception as e:
@@ -59,13 +59,6 @@ def generar_analisis_ia(df):
 @st.cache_data(show_spinner=False)
 def cached_ia_analysis(df):
     return generar_analisis_ia(df)
-
-# Configurar la página
-st.set_page_config(
-    page_title="Analizador de Datos",
-    page_icon="📊",
-    layout="wide"
-)
 
 # Cargar datos de ejemplo
 @st.cache_data
