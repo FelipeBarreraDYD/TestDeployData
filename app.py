@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import torch
 from transformers import pipeline
 
 # Configuración de página DEBE SER LA PRIMERA LÍNEA
@@ -12,17 +13,20 @@ st.set_page_config(
     layout="wide"
 )
 
-# Cargar modelo de IA local compatible
 @st.cache_resource
 def load_ai_model():
     try:
+        import torch
+        # Carga y cachea el pipeline de Llama 3.1
         return pipeline(
             task="text-generation",
-            model="PlanTL-GOB-ES/gpt2-base-bne",  # Modelo compatible en Español
-            device=-1
+            model="meta-llama/Meta-Llama-3.1-8B-Instruct",
+            model_kwargs={"torch_dtype": torch.bfloat16},  # usar float32 si en CPU
+            device_map="auto",                            # o device=-1 para CPU
+            trust_remote_code=True                        # habilita código personalizado
         )
     except Exception as e:
-        st.error(f"Error cargando el modelo: {str(e)}")
+        st.error(f"Error cargando el modelo: {e}")
         st.stop()
 
 generator = load_ai_model()
@@ -30,15 +34,8 @@ generator = load_ai_model()
 # Función de análisis optimizada
 def generar_analisis_ia(df):
     try:
-        # 1. Usar modelo en español especializado
-        model = pipeline(
-            task="text2text-generation",
-            model="projecte-aina/aguila-7b",
-            device=-1
-        )
-        # 2. Limitar y formatear datos de muestra
+        model = generator
         sample_data = df.head(2).to_markdown()
-        # 3. Prompt estructurado con ejemplo
         prompt = f"""
         Eres un experto en análisis de datos educativos. Analiza este dataset:
         
@@ -64,7 +61,7 @@ def generar_analisis_ia(df):
         # 4. Configuración de generación optimizada
         response = model(
             prompt,
-            max_length=600,
+            max_new_tokens=600,
             temperature=0.3,
             do_sample=True,
             num_beams=3
