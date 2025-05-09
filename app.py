@@ -33,7 +33,7 @@ def generar_analisis_ia(df):
         # 1. Usar modelo en español especializado
         model = pipeline(
             task="text2text-generation",
-            model="Recognai/gelectra-base-instruct",
+            model="projecte-aina/aguila-7b",
             device=-1
         )
         # 2. Limitar y formatear datos de muestra
