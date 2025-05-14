@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.cluster import KMeans
 from huggingface_hub import InferenceClient
 
 # Configuración de página DEBE SER LA PRIMERA LÍNEA
@@ -103,7 +104,7 @@ current_df = load_and_clean(uploaded_file) if uploaded_file else load_sample_dat
 # Navbar actualizada
 page = st.sidebar.radio(
     "Navegación",
-    ["Inicio", "Análisis Exploratorio", "Análisis Descriptivo", "Acerca de"]
+    ["Inicio", "Análisis Exploratorio", "Análisis Descriptivo", "Clustering" "Acerca de"]
 )
 
 # Título de la aplicación
@@ -208,6 +209,41 @@ elif page == "Análisis Descriptivo":
                 st.write(f"Tamaño del informe: {len(st.session_state.ia_report)//4} tokens aproximados")
         else:
             st.info("Presiona el botón para generar un análisis con IA")
+
+# Página Clustering
+elif page == "Clustering":
+    st.header("🔢 Agrupamiento Básico")
+    
+    if current_df is None:
+        st.warning("Primero carga un dataset")
+    else:
+        # Paso 1: Seleccionar columnas numéricas
+        numeric_cols = current_df.select_dtypes(include=np.number).columns.tolist()
+        
+        if len(numeric_cols) < 2:
+            st.error("Necesitas al menos 2 columnas numéricas")
+        else:
+            # Paso 2: El usuario elige 2 columnas
+            col1, col2 = st.columns(2)
+            with col1:
+                x_col = st.selectbox("Variable X", numeric_cols)
+            with col2:
+                y_col = st.selectbox("Variable Y", numeric_cols)
+            
+            # Paso 3: Entrenar modelo simple (3 clusters)
+            X = current_df[[x_col, y_col]].dropna()
+            n_clusters = st.slider("Número de clusters", 2, 5, 3)
+            kmeans = KMeans(n_clusters=3, random_state=42)
+            clusters = kmeans.fit_predict(X)
+            
+            # Paso 4: Mostrar gráfico
+            fig, ax = plt.subplots()
+            sns.scatterplot(x=X[x_col], y=X[y_col], hue=clusters, palette="viridis", ax=ax)
+            st.pyplot(fig)
+            
+            # Paso 5: Mostrar centros
+            st.write("Centros de los clusters:")
+            st.dataframe(pd.DataFrame(kmeans.cluster_centers_, columns=[x_col, y_col]))
 
 # Página Acerca de
 elif page == "Acerca de":
