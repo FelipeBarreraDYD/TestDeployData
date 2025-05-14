@@ -230,20 +230,23 @@ elif page == "Clustering":
             with col2:
                 y_col = st.selectbox("Variable Y", numeric_cols)
             
-            # Paso 3: Entrenar modelo simple (3 clusters)
-            X = current_df[[x_col, y_col]].dropna()
-            n_clusters = st.slider("Número de clusters", 2, 5, 3)
-            kmeans = KMeans(n_clusters=3, random_state=42)
-            clusters = kmeans.fit_predict(X)
+            # Paso 3: Filtrar y convertir a numpy
+            clean_df = current_df[[x_col, y_col]].dropna()
+            X = clean_df.values
             
-            # Paso 4: Mostrar gráfico
-            fig, ax = plt.subplots()
-            sns.scatterplot(x=X[x_col], y=X[y_col], hue=clusters, palette="viridis", ax=ax)
-            st.pyplot(fig)
-            
-            # Paso 5: Mostrar centros
-            st.write("Centros de los clusters:")
-            st.dataframe(pd.DataFrame(kmeans.cluster_centers_, columns=[x_col, y_col]))
+            if len(X) < 2:
+                st.error("No hay suficientes datos después de limpiar")
+            else:
+                # Paso 4: Modelo simple con matplotlib
+                kmeans = KMeans(n_clusters=3, random_state=42)
+                clusters = kmeans.fit_predict(X)
+                
+                # Paso 5: Gráfico básico
+                fig, ax = plt.subplots()
+                ax.scatter(X[:,0], X[:,1], c=clusters, cmap='viridis')
+                ax.set_xlabel(x_col)
+                ax.set_ylabel(y_col)
+                st.pyplot(fig)
 
 # Página Acerca de
 elif page == "Acerca de":
