@@ -104,7 +104,7 @@ current_df = load_and_clean(uploaded_file) if uploaded_file else load_sample_dat
 # Navbar actualizada
 page = st.sidebar.radio(
     "Navegación",
-    ["Inicio", "Análisis Exploratorio", "Análisis Descriptivo", "Clustering" "Acerca de"]
+    ["Inicio", "Análisis Exploratorio", "Análisis Descriptivo", "Clustering", "Acerca de"]
 )
 
 # Título de la aplicación
