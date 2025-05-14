@@ -76,6 +76,8 @@ clean_method = st.sidebar.radio(
     "Manejar valores faltantes:",
     ["Rellenar con 0", "Eliminar filas con NA"]
 )
+remove_duplicates = st.sidebar.checkbox("Eliminar duplicados")
+encode_categorical = st.sidebar.checkbox("Codificar variables categóricas")
 
 # Función de carga modificada para resetear el análisis previo
 def load_and_clean(uploader):
@@ -88,6 +90,12 @@ def load_and_clean(uploader):
         # Resetear análisis anterior al cargar nuevo dataset
         if 'ia_report' in st.session_state:
             del st.session_state.ia_report
+        
+        if remove_duplicates:
+            df = df.drop_duplicates()
+            
+        if encode_categorical and not df.select_dtypes(include=['object']).empty:
+            df = pd.get_dummies(df)
             
         if clean_method == "Rellenar con 0":
             df.fillna(0, inplace=True)
@@ -229,7 +237,6 @@ elif page == "Clustering":
                 x_col = st.selectbox("Variable X", numeric_cols)
             with col2:
                 y_col = st.selectbox("Variable Y", numeric_cols)
-            
             # Paso 3: Filtrar y convertir a numpy
             clean_df = current_df[[x_col, y_col]].dropna()
             X = clean_df.values
@@ -237,31 +244,53 @@ elif page == "Clustering":
             if len(X) < 2:
                 st.error("No hay suficientes datos después de limpiar")
             else:
-                # Paso 4: Modelo simple con matplotlib
-                kmeans = KMeans(n_clusters=3, random_state=42)
+                # Paso 4: Modelo simple
+                n_clusters = st.slider("Número de clusters", 2, 3, 5)
+                kmeans = KMeans(n_clusters=n_clusters, random_state=42)
                 clusters = kmeans.fit_predict(X)
-                
-                # Paso 5: Gráfico básico
+                # Paso 5: Gráfico
                 fig, ax = plt.subplots()
-                ax.scatter(X[:,0], X[:,1], c=clusters, cmap='viridis')
+                scatter = ax.scatter(X[:,0], X[:,1], c=clusters, cmap='viridis', alpha=0.6)
+                centers = kmeans.cluster_centers_
+                ax.scatter(centers[:, 0], centers[:, 1], c='red', s=200, marker='X')
+                ax.set_title(f'Agrupamiento en {n_clusters} clusters')
                 ax.set_xlabel(x_col)
                 ax.set_ylabel(y_col)
+                plt.colorbar(scatter)
                 st.pyplot(fig)
-
 # Página Acerca de
 elif page == "Acerca de":
     st.header("Acerca de la Aplicación")
     st.markdown("""
-    ### Características Principales:
-    - **Carga múltiples formatos:** CSV y Excel
-    - **Limpieza automática:** Manejo de valores faltantes
-    - **Visualización interactiva:** Gráficos personalizables
-    - **Análisis estadístico:** Informes descriptivos completos
-    - **Análisis IA automatizado:** Se ejecuta al cargar datos
-
-    Desarrollado con Streamlit y Python 🐍
-    """
-    )
+    ### 🧠 Sistema Integral de Análisis de Datos
+    
+    **Características principales:**
+    - 📤 **Carga inteligente:** Soporta CSV
+    - 🧹 **Limpieza avanzada:** 
+        - Manejo de valores nulos (eliminación/relleno)
+        - Eliminación de duplicados
+        - Codificación automática de variables categóricas
+    - 📈 **Análisis exploratorio:** 
+        - Visualizaciones interactivas (histogramas, dispersión, barras)
+        - Matriz de correlación dinámica
+    - 🤖 **IA integrada:** 
+        - Generación automática de informes descriptivos
+        - Detección de patrones clave
+    - 🔍 **Modelado predictivo:** 
+        - Clustering básico con K-Means
+        - Visualización 2D de grupos
+    
+    **Tecnologías clave:**
+    - 🐍 Python 3.12
+    - 🎈 Streamlit para la interfaz
+    - 🤗 Transformers de Hugging Face
+    - 📊 Matplotlib/Seaborn para visualizaciones
+    
+    **¿Qué lo hace único?**
+    - ✅ Interfaz intuitiva para no expertos
+    - 🔄 Flujo de análisis completo en 4 pasos
+    - 🧩 Integración perfecta entre IA tradicional y LLMs
+    """)
 
 if __name__ == "__main__":
     pass
